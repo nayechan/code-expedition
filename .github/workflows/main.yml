@@ -1,0 +1,20 @@
+name: Release Source
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create zip
+        run: git archive --format=zip --output=source-${{ github.ref_name }}.zip HEAD
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: source-${{ github.ref_name }}.zip

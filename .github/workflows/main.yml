@@ -8,6 +8,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 이거 추가
     steps:
       - uses: actions/checkout@v4
 

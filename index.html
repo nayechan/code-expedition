@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Co-Te Expedition</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      min-width: 480px;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #58a6ff;
+      margin-bottom: 12px;
+      letter-spacing: -0.3px;
+    }
+
+    /* Problem card */
+    #problem-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    #problem-date-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    #problem-date {
+      font-size: 11px;
+      color: #8b949e;
+      flex: 1;
+    }
+    .nav-btn {
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0 3px;
+      line-height: 1;
+    }
+    .nav-btn:hover:not(:disabled) { color: #e6edf3; }
+    .nav-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+    #problem-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 6px;
+    }
+    #problem-title a {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+    #problem-title a:hover { text-decoration: underline; }
+    #problem-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tier-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+    }
+    .tier-unrated  { background: #21262d; color: #8b949e; }
+    .tier-bronze   { background: #3d2000; color: #ad5600; }
+    .tier-silver   { background: #1a2433; color: #7ea8c9; }
+    .tier-gold     { background: #3d2e00; color: #ec9a00; }
+    .tier-platinum { background: #003d2e; color: #27e2a4; }
+    .tier-diamond  { background: #00223d; color: #00b4fc; }
+    .tier-ruby     { background: #3d0015; color: #ff0062; }
+    .tier-master   { background: #2a003d; color: #b300e0; }
+
+    #problem-stats { font-size: 12px; color: #8b949e; }
+    #load-status { font-size: 12px; color: #8b949e; margin-top: 6px; }
+
+    /* Timer */
+    #timer-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    #timer-display-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    #timer-display {
+      font-size: 42px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #e6edf3;
+      letter-spacing: -1px;
+      transition: color 0.3s;
+    }
+    #timer-display.overtime { color: #f85149; }
+
+    #timer-diff {
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+      min-width: 0;
+    }
+    #timer-diff.overtime { color: #f85149; }
+    #timer-diff.undertime { color: #3fb950; }
+
+    .timer-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #e6edf3;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { background: #30363d; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: #1f6feb; border-color: #1f6feb; }
+    .btn-primary:hover { background: #388bfd; border-color: #388bfd; }
+    .btn-danger { background: #da3633; border-color: #da3633; }
+    .btn-danger:hover { background: #f85149; border-color: #f85149; }
+    .btn-success { background: #238636; border-color: #238636; }
+    .btn-success:hover { background: #2ea043; border-color: #2ea043; }
+
+    #settings-body input[type="number"] {
+      width: 64px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #e6edf3;
+      font-size: 13px;
+      padding: 5px 8px;
+      text-align: center;
+    }
+    #settings-body input[type="number"]:focus { outline: none; border-color: #58a6ff; }
+
+    /* Advanced (nested details) */
+    #advanced-section {
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    #advanced-section > summary {
+      padding: 7px 12px;
+      background: #0d1117;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6e7681;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      user-select: none;
+    }
+    #advanced-section > summary::-webkit-details-marker { display: none; }
+    #advanced-section > summary::before {
+      content: '▶';
+      font-size: 9px;
+      transition: transform 0.2s;
+    }
+    #advanced-section[open] > summary::before { transform: rotate(90deg); }
+    #advanced-body {
+      padding: 12px 12px 4px;
+      border-top: 1px solid #30363d;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .field-row label {
+      font-size: 12px;
+      color: #8b949e;
+      min-width: 60px;
+    }
+    .field-row select, .field-row input[type="text"] {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #e6edf3;
+      font-size: 13px;
+      padding: 5px 8px;
+      min-width: 120px;
+    }
+    .field-row select:focus, .field-row input[type="text"]:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+
+    /* Settings */
+    #settings-section {
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #settings-section summary {
+      padding: 10px 16px;
+      background: #161b22;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    #settings-section summary::-webkit-details-marker { display: none; }
+    #settings-section summary::before {
+      content: '▶';
+      font-size: 10px;
+      transition: transform 0.2s;
+    }
+    #settings-section[open] summary::before { transform: rotate(90deg); }
+    #settings-body {
+      padding: 14px 16px;
+      background: #161b22;
+      border-top: 1px solid #30363d;
+    }
+    #settings-body .field-row { margin-bottom: 10px; }
+    .help-text { font-size: 11px; color: #6e7681; margin-top: 4px; }
+
+    /* Apps Script code block */
+    #script-code-wrap {
+      margin-top: 12px;
+    }
+    #script-code-label {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #script-code {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+      font-size: 11px;
+      color: #e6edf3;
+      white-space: pre;
+      overflow-x: auto;
+      max-height: 220px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    .copy-btn {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #8b949e;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #30363d; color: #e6edf3; }
+  </style>
+</head>
+<body>
+
+<h1>🚀 Co-Te Expedition</h1>
+
+<!-- Problem Card -->
+<div id="problem-card">
+  <div id="problem-date-row">
+    <button class="nav-btn" id="btn-prev" disabled>◀</button>
+    <span id="problem-date">로딩 중…</span>
+    <button class="nav-btn" id="btn-next" disabled>▶</button>
+  </div>
+  <div id="problem-title">—</div>
+  <div id="problem-meta">
+    <span class="tier-badge tier-unrated" id="tier-badge">?</span>
+    <span id="problem-stats"></span>
+  </div>
+  <div id="load-status"></div>
+</div>
+
+<!-- Timer -->
+<div id="timer-section">
+  <div id="timer-display-row">
+    <div id="timer-display">60:00</div>
+    <div id="timer-diff"></div>
+  </div>
+  <div class="timer-controls">
+    <button class="btn btn-primary" id="btn-start">▶ 시작</button>
+  </div>
+</div>
+
+
+<!-- Settings -->
+<details id="settings-section">
+  <summary>⚙ 설정</summary>
+  <div id="settings-body">
+    <div class="field-row">
+      <label for="timer-min">제한 시간</label>
+      <input type="number" id="timer-min" value="60" min="1" max="999">
+      <span style="font-size:12px;color:#8b949e">분</span>
+    </div>
+    <div class="field-row">
+      <label for="member-select">팀원</label>
+      <select id="member-select">
+        <option value="김호민">김호민</option>
+        <option value="나예찬">나예찬</option>
+        <option value="이준용">이준용</option>
+        <option value="장재범">장재범</option>
+        <option value="정찬호">정찬호</option>
+        <option value="최진혁">최진혁</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <label for="solved-id">solved.ac ID</label>
+      <input type="text" id="solved-id" placeholder="예: jihye1234">
+    </div>
+
+    <details id="advanced-section">
+      <summary>고급</summary>
+      <div id="advanced-body">
+        <div class="field-row">
+          <label for="script-url">Apps Script URL</label>
+          <input type="text" id="script-url" placeholder="https://script.google.com/macros/s/…/exec">
+        </div>
+        <p class="help-text">Google Apps Script를 배포한 후 웹 앱 URL을 입력하세요.</p>
+        <div id="script-code-wrap">
+          <div id="script-code-label">
+            <span>Google Apps Script 코드 (복사 후 스크립트 에디터에 붙여넣기)</span>
+            <button class="copy-btn">복사</button>
+          </div>
+          <div id="script-code">const MEMBER_COL = { '김호민': 4, '나예찬': 5, '이준용': 6, '장재범': 7, '정찬호': 8, '최진혁': 9 };
+
+function doGet(e) {
+  const p = e.parameter;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  const display = range.getDisplayValues();
+  const col = MEMBER_COL[p.member];
+  if (!col) return json({ ok: false, error: 'Unknown member' });
+  for (let i = 1; i &lt; display.length; i++) {
+    if (normDate(display[i][0]) === p.date) {
+      sheet.getRange(i + 1, col).setValue(parseFloat(p.solveTime));
+      return json({ ok: true });
+    }
+  }
+  return json({ ok: false, error: 'Date not found: ' + p.date });
+}
+
+function normDate(v) {
+  const m = String(v).match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+  return m ? `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}` : '';
+}
+
+function json(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+          </div>
+        </div>
+      </div>
+    </details>
+  </div>
+</details>
+
+<script src="app.js"></script>
+
+</body>
+</html>

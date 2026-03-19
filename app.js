@@ -33,9 +33,9 @@ let todayRow = null;   // 오늘 행 (편의 참조)
 
 let timerInterval = null;
 let timerRunning = false;
-let timerSeconds = 60 * 60;
+let timerStartTs = 0;   // Date.now() 기준 시작 타임스탬프 (경과 = Date.now() - timerStartTs)
 let timerLimit = 60 * 60;
-let elapsedSeconds = 0;
+let elapsedSeconds = 0; // 현재 경과 초 (항상 Date.now() - timerStartTs 에서 계산)
 let solvedAt = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -78,27 +78,17 @@ function restoreTimerState() {
 
   const running = localStorage.getItem('cote_timer_running') === 'true';
   const startTs = parseInt(localStorage.getItem('cote_timer_start_ts') || '0', 10);
-  const pausedAt = parseFloat(localStorage.getItem('cote_timer_paused_at') || '0');
 
   if (running && startTs) {
-    elapsedSeconds = Math.round((Date.now() - startTs) / 1000);
-  } else {
-    elapsedSeconds = pausedAt;
-  }
-  timerSeconds = timerLimit - elapsedSeconds;
-  renderTimer();
-
-  if (running) {
+    timerStartTs = startTs;
+    elapsedSeconds = Math.round((Date.now() - timerStartTs) / 1000);
     timerRunning = true;
-    timerInterval = setInterval(() => {
-      timerSeconds--;
-      elapsedSeconds++;
-      renderTimer();
-    }, 1000);
+    timerInterval = setInterval(tickTimer, 500);
     const btn = document.getElementById('btn-start');
     btn.textContent = '✓ 풀이 확인';
     btn.className = 'btn btn-success';
   }
+  renderTimer();
 }
 
 function applySolvedState(elapsedSec) {
@@ -374,16 +364,17 @@ function onBtnStartClick() {
   }
 }
 
+function tickTimer() {
+  elapsedSeconds = Math.round((Date.now() - timerStartTs) / 1000);
+  renderTimer();
+}
+
 function timerStart() {
   timerRunning = true;
-  const startTs = Date.now() - elapsedSeconds * 1000;
+  timerStartTs = Date.now() - elapsedSeconds * 1000;
   localStorage.setItem('cote_timer_running', 'true');
-  localStorage.setItem('cote_timer_start_ts', startTs);
-  timerInterval = setInterval(() => {
-    timerSeconds--;
-    elapsedSeconds++;
-    renderTimer();
-  }, 1000);
+  localStorage.setItem('cote_timer_start_ts', timerStartTs);
+  timerInterval = setInterval(tickTimer, 500);
   const btn = document.getElementById('btn-start');
   btn.textContent = '✓ 풀이 확인';
   btn.className = 'btn btn-success';
@@ -393,10 +384,7 @@ function timerSetLimit() {
   const min = parseInt(document.getElementById('timer-min').value, 10) || 60;
   localStorage.setItem('cote_timer_min', min);
   timerLimit = min * 60;
-  if (!timerRunning) {
-    timerSeconds = timerLimit - elapsedSeconds;
-    renderTimer();
-  }
+  if (!timerRunning) renderTimer();
 }
 
 function fmtSec(sec) {
@@ -432,7 +420,7 @@ function renderTimer() {
 
   diffEl.textContent = '';
   diffEl.className = '';
-  const s = timerSeconds;
+  const s = timerLimit - elapsedSeconds;
   const abs = Math.abs(s);
   const mm = String(Math.floor(abs / 60)).padStart(2, '0');
   const ss = String(abs % 60).padStart(2, '0');
@@ -460,13 +448,13 @@ async function checkSolved() {
       const confirmed = confirm(`${todayRow.title}\n\n풀이를 완료했나요?`);
       if (!confirmed) return;
       const currentElapsed = elapsedSeconds;
+      markSolved(currentElapsed);
       if (currentElapsed > 0) {
         const solveMin = (currentElapsed / 60).toFixed(1);
         setStatus('시트에 기록 중…');
         await recordToSheet(member, todayRow.date, parseFloat(solveMin));
         todayRow.memberValues[member] = solveMin;
       }
-      markSolved(currentElapsed);
       setStatus('');
       return;
     }
@@ -481,6 +469,7 @@ async function checkSolved() {
 
     if (data.count > 0) {
       const currentElapsed = elapsedSeconds;
+      markSolved(currentElapsed);
       // 타이머를 한 번도 시작하지 않은 경우 시간 기록 생략
       if (currentElapsed > 0) {
         const solveMin = (currentElapsed / 60).toFixed(1);
@@ -488,7 +477,6 @@ async function checkSolved() {
         await recordToSheet(member, todayRow.date, parseFloat(solveMin));
         todayRow.memberValues[member] = solveMin;
       }
-      markSolved(currentElapsed);
       setStatus('');
     } else {
       setStatus('풀이 기록 없음');
@@ -529,7 +517,7 @@ function onMemberChange() {
     timerRunning = false;
   }
   elapsedSeconds = 0;
-  timerSeconds = timerLimit;
+  timerStartTs = 0;
   solvedAt = null;
   localStorage.setItem('cote_timer_running', 'false');
   localStorage.setItem('cote_timer_paused_at', '0');

@@ -42,8 +42,10 @@ let solvedAt = null;
 window.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   loadSpreadsheet();
+  scheduleNightReset();
 
   document.getElementById('btn-start').addEventListener('click', onBtnStartClick);
+  document.getElementById('btn-reset').addEventListener('click', resetTimer);
   document.getElementById('btn-prev').addEventListener('click', () => navigateTo(viewIndex - 1));
   document.getElementById('btn-next').addEventListener('click', () => navigateTo(viewIndex + 1));
   document.getElementById('timer-min').addEventListener('change', timerSetLimit);
@@ -80,6 +82,18 @@ function restoreTimerState() {
   const startTs = parseInt(localStorage.getItem('cote_timer_start_ts') || '0', 10);
 
   if (running && startTs) {
+    // 시작일과 현재가 KST 기준 다른 날이면 타이머 무효화
+    const KST = 9 * 3600 * 1000;
+    const DAY = 24 * 3600 * 1000;
+    const startKstDay = Math.floor((startTs + KST) / DAY);
+    const nowKstDay = Math.floor((Date.now() + KST) / DAY);
+    if (startKstDay < nowKstDay) {
+      localStorage.setItem('cote_timer_running', 'false');
+      localStorage.removeItem('cote_timer_start_ts');
+      renderTimer();
+      return;
+    }
+
     timerStartTs = startTs;
     elapsedSeconds = Math.round((Date.now() - timerStartTs) / 1000);
     timerRunning = true;
@@ -94,12 +108,8 @@ function restoreTimerState() {
 function applySolvedState(elapsedSec) {
   solvedAt = elapsedSec;
   elapsedSeconds = elapsedSec;
-  timerSeconds = timerLimit - elapsedSec;
   renderTimer();
-  const btn = document.getElementById('btn-start');
-  btn.textContent = '✓ 풀이 확인';
-  btn.className = 'btn btn-success';
-  btn.disabled = true;
+  updateStartBtn();
 }
 
 function markSolved(elapsedSec) {
@@ -309,24 +319,29 @@ function updateTimerDisplay() {
 function updateStartBtn() {
   const isToday = viewIndex === todayIndex;
   const btn = document.getElementById('btn-start');
+  const resetBtn = document.getElementById('btn-reset');
   if (!isToday) {
     btn.textContent = '▶ 시작';
     btn.className = 'btn btn-primary';
     btn.disabled = true;
+    resetBtn.style.display = 'none';
     return;
   }
   if (solvedAt !== null) {
     btn.textContent = '✓ 풀이 확인';
     btn.className = 'btn btn-success';
     btn.disabled = true;
+    resetBtn.style.display = 'none';
   } else if (timerRunning) {
     btn.textContent = '✓ 풀이 확인';
     btn.className = 'btn btn-success';
     btn.disabled = false;
+    resetBtn.style.display = '';
   } else {
     btn.textContent = '▶ 시작';
     btn.className = 'btn btn-primary';
     btn.disabled = false;
+    resetBtn.style.display = 'none';
   }
 }
 
@@ -369,15 +384,37 @@ function tickTimer() {
   renderTimer();
 }
 
+function resetTimer() {
+  if (!timerRunning) return;
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timerRunning = false;
+  timerStartTs = 0;
+  elapsedSeconds = 0;
+  localStorage.setItem('cote_timer_running', 'false');
+  localStorage.removeItem('cote_timer_start_ts');
+  renderTimer();
+  updateStartBtn();
+}
+
+function scheduleNightReset() {
+  const KST_OFFSET = 9 * 3600 * 1000;
+  const nowKst = Date.now() + KST_OFFSET;
+  const DAY_MS = 24 * 3600 * 1000;
+  const nextKstMidnightUtc = (Math.floor(nowKst / DAY_MS) + 1) * DAY_MS - KST_OFFSET;
+  const msUntil = nextKstMidnightUtc - Date.now();
+  setTimeout(() => {
+    if (timerRunning) resetTimer();
+  }, msUntil);
+}
+
 function timerStart() {
   timerRunning = true;
   timerStartTs = Date.now() - elapsedSeconds * 1000;
   localStorage.setItem('cote_timer_running', 'true');
   localStorage.setItem('cote_timer_start_ts', timerStartTs);
   timerInterval = setInterval(tickTimer, 500);
-  const btn = document.getElementById('btn-start');
-  btn.textContent = '✓ 풀이 확인';
-  btn.className = 'btn btn-success';
+  updateStartBtn();
 }
 
 function timerSetLimit() {
@@ -470,7 +507,6 @@ async function checkSolved() {
     if (data.count > 0) {
       const currentElapsed = elapsedSeconds;
       markSolved(currentElapsed);
-      // 타이머를 한 번도 시작하지 않은 경우 시간 기록 생략
       if (currentElapsed > 0) {
         const solveMin = (currentElapsed / 60).toFixed(1);
         setStatus('시트에 기록 중…');
@@ -479,7 +515,17 @@ async function checkSolved() {
       }
       setStatus('');
     } else {
-      setStatus('풀이 기록 없음');
+      const confirmed = confirm(`${todayRow.title}\n\n아직 풀지 않은 문제입니다. 정말 완료하시겠습니까?`);
+      if (!confirmed) { setStatus('풀이 기록 없음'); return; }
+      const currentElapsed = elapsedSeconds;
+      markSolved(currentElapsed);
+      if (currentElapsed > 0) {
+        const solveMin = (currentElapsed / 60).toFixed(1);
+        setStatus('시트에 기록 중…');
+        await recordToSheet(member, todayRow.date, parseFloat(solveMin));
+        todayRow.memberValues[member] = solveMin;
+      }
+      setStatus('');
     }
   } catch (e) {
     setStatus('오류: ' + e.message);

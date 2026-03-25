@@ -135,7 +135,7 @@ async function loadSpreadsheet() {
     parseCSV(text);
     const solvedId = document.getElementById('solved-id').value.trim();
     if (todayRow && todayRow.isBaekjoon && solvedId) {
-      await checkSolved();
+      await checkSolved(false);
     }
   } catch (e) {
     setStatus('❌ 스프레드시트 로드 실패: ' + e.message);
@@ -375,7 +375,7 @@ function onBtnStartClick() {
   if (!timerRunning) {
     timerStart();
   } else {
-    checkSolved();
+    checkSolved(true);
   }
 }
 
@@ -466,7 +466,7 @@ function renderTimer() {
 }
 
 // ── Check & Record ────────────────────────────────────────────────────────────
-async function checkSolved() {
+async function checkSolved(manual = false) {
   if (viewIndex !== todayIndex || !todayRow) return;
   const member = document.getElementById('member-select').value;
 
@@ -515,6 +515,7 @@ async function checkSolved() {
       }
       setStatus('');
     } else {
+      if (!manual) { setStatus('풀이 기록 없음'); return; }
       const confirmed = confirm(`${todayRow.title}\n\n아직 풀지 않은 문제입니다. 정말 완료하시겠습니까?`);
       if (!confirmed) { setStatus('풀이 기록 없음'); return; }
       const currentElapsed = elapsedSeconds;

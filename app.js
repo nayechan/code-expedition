@@ -3,7 +3,7 @@ const SHEET_ID = '1ZgRYGNyw9lOvr1nwhhsZVHDSuGPVsXH4YfCec3h1O0o';
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 const IS_EXTENSION = typeof chrome !== 'undefined' && !!chrome?.runtime?.id;
 
-const MEMBER_COL_IDX = { '김호민': 3, '나예찬': 4, '이준용': 5, '장재범': 6, '정찬호': 7, '최진혁': 8 };
+const MEMBER_COL_IDX = { '김호민': 3, '나예찬': 4, '이준용': 5, '장재범': 6, '정찬호': 7, '최진혁': 8, '김희준': 9 };
 
 const TIER_NAMES = [
   'Unrated','Bronze V','Bronze IV','Bronze III','Bronze II','Bronze I',
@@ -55,7 +55,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelector('.copy-btn').addEventListener('click', copyScript);
 });
 
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlY-DVYx7bIdy4u_wGyk2mlwfev5H_DsvZJfsYFsoABQv0VEmZyVvZaRuYZ0is-Y0syQ/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8imwJIvl6ZkTdvBtgG3uHkf6tz4St8rCzHHeBjPHL7EDb5p0_PbbFxejDXJuDy8HiXA/exec';
 
 function loadSettings() {
   const member = localStorage.getItem('cote_member') || '나예찬';

@@ -118,14 +118,11 @@ function parseCSV(text) {
   allRows = [];
   todayIndex = -1;
 
-  if (rows.length < 2) return;
+  if (rows.length < 3) return;
 
-  console.log('row0:', rows[0]);
-  console.log('row1:', rows[1]);
-  console.log('row2:', rows[2]);
-
-  // 2행에서 팀원 이름과 컬럼 인덱스 추출 (Average 열 이전까지)
-  const headerCols = splitCSVRow(rows[1]);
+  // 3행(index 2)에서 팀원 이름과 컬럼 인덱스 추출 (Average 열 이전까지)
+  // 1행의 "비고" 셀에 줄바꿈이 있어 CSV가 2줄로 분리되므로 실제 헤더는 index 2
+  const headerCols = splitCSVRow(rows[2]);
   const memberNames = [];
   const memberColIdx = {};
   for (let c = 3; c < headerCols.length; c++) {
@@ -136,7 +133,7 @@ function parseCSV(text) {
   }
   populateMemberSelect(memberNames);
 
-  for (let i = 2; i < rows.length; i++) {
+  for (let i = 3; i < rows.length; i++) {
     const cols = splitCSVRow(rows[i]);
     const rawDate = cols[0] || '';
     const norm = normalizeDate(rawDate);

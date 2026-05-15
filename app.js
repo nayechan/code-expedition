@@ -120,6 +120,10 @@ function parseCSV(text) {
 
   if (rows.length < 2) return;
 
+  console.log('row0:', rows[0]);
+  console.log('row1:', rows[1]);
+  console.log('row2:', rows[2]);
+
   // 2행에서 팀원 이름과 컬럼 인덱스 추출 (Average 열 이전까지)
   const headerCols = splitCSVRow(rows[1]);
   const memberNames = [];

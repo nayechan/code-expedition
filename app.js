@@ -3,28 +3,6 @@ const SHEET_ID = '1ZgRYGNyw9lOvr1nwhhsZVHDSuGPVsXH4YfCec3h1O0o';
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 const IS_EXTENSION = typeof chrome !== 'undefined' && !!chrome?.runtime?.id;
 
-const MEMBER_COL_IDX = { '김호민': 3, '나예찬': 4, '이준용': 5, '장재범': 6, '정찬호': 7, '최진혁': 8, '김희준': 9 };
-
-const TIER_NAMES = [
-  'Unrated','Bronze V','Bronze IV','Bronze III','Bronze II','Bronze I',
-  'Silver V','Silver IV','Silver III','Silver II','Silver I',
-  'Gold V','Gold IV','Gold III','Gold II','Gold I',
-  'Platinum V','Platinum IV','Platinum III','Platinum II','Platinum I',
-  'Diamond V','Diamond IV','Diamond III','Diamond II','Diamond I',
-  'Ruby V','Ruby IV','Ruby III','Ruby II','Ruby I',
-  'Master'
-];
-const TIER_CLASS = [
-  'unrated',
-  'bronze','bronze','bronze','bronze','bronze',
-  'silver','silver','silver','silver','silver',
-  'gold','gold','gold','gold','gold',
-  'platinum','platinum','platinum','platinum','platinum',
-  'diamond','diamond','diamond','diamond','diamond',
-  'ruby','ruby','ruby','ruby','ruby',
-  'master'
-];
-
 // ── State ─────────────────────────────────────────────────────────────────────
 let allRows = [];      // 전체 행
 let todayIndex = -1;   // 오늘 행의 인덱스
@@ -50,7 +28,6 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-next').addEventListener('click', () => navigateTo(viewIndex + 1));
   document.getElementById('timer-min').addEventListener('change', timerSetLimit);
   document.getElementById('member-select').addEventListener('change', onMemberChange);
-  document.getElementById('solved-id').addEventListener('input', saveSolvedId);
   document.getElementById('script-url').addEventListener('input', saveScriptUrl);
   document.querySelector('.copy-btn').addEventListener('click', copyScript);
 });
@@ -58,15 +35,11 @@ window.addEventListener('DOMContentLoaded', () => {
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8imwJIvl6ZkTdvBtgG3uHkf6tz4St8rCzHHeBjPHL7EDb5p0_PbbFxejDXJuDy8HiXA/exec';
 
 function loadSettings() {
-  const member = localStorage.getItem('cote_member') || '나예찬';
-  document.getElementById('member-select').value = member;
-  loadSolvedIdForMember(member);
   const url = localStorage.getItem('cote_script_url') || DEFAULT_SCRIPT_URL;
   document.getElementById('script-url').value = url;
   const min = parseInt(localStorage.getItem('cote_timer_min') || '60', 10);
   document.getElementById('timer-min').value = min;
   timerLimit = min * 60;
-  restoreTimerState();
 }
 
 function restoreTimerState() {
@@ -133,10 +106,7 @@ async function loadSpreadsheet() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const text = await resp.text();
     parseCSV(text);
-    const solvedId = document.getElementById('solved-id').value.trim();
-    if (todayRow && todayRow.isBaekjoon && solvedId) {
-      await checkSolved(false);
-    }
+    restoreTimerState();
   } catch (e) {
     setStatus('❌ 스프레드시트 로드 실패: ' + e.message);
   }
@@ -148,6 +118,20 @@ function parseCSV(text) {
   allRows = [];
   todayIndex = -1;
 
+  if (rows.length === 0) return;
+
+  // 헤더 행에서 팀원 이름과 컬럼 인덱스 추출 (Average 열 이전까지)
+  const headerCols = splitCSVRow(rows[0]);
+  const memberNames = [];
+  const memberColIdx = {};
+  for (let c = 3; c < headerCols.length; c++) {
+    const name = headerCols[c].trim().replace(/^"(.*)"$/, '$1');
+    if (!name || name === 'Average') break;
+    memberNames.push(name);
+    memberColIdx[name] = c;
+  }
+  populateMemberSelect(memberNames);
+
   for (let i = 1; i < rows.length; i++) {
     const cols = splitCSVRow(rows[i]);
     const rawDate = cols[0] || '';
@@ -157,10 +141,8 @@ function parseCSV(text) {
     const title = cols[1] || '제목 없음';
     const link = cols[2] || '';
     const cleanLink = link.replace(/^"(.*)"$/, '$1');
-    const isBaekjoon = cleanLink.includes('acmicpc.net');
-    const probMatch = cleanLink.match(/\/problem\/(\d+)/);
     const memberValues = {};
-    for (const [name, idx] of Object.entries(MEMBER_COL_IDX)) {
+    for (const [name, idx] of Object.entries(memberColIdx)) {
       memberValues[name] = (cols[idx] || '').trim();
     }
 
@@ -168,8 +150,6 @@ function parseCSV(text) {
       date: norm,
       title: title.replace(/^"(.*)"$/, '$1'),
       link: cleanLink,
-      isBaekjoon,
-      problemId: isBaekjoon && probMatch ? probMatch[1] : null,
       memberValues
     });
 
@@ -184,6 +164,19 @@ function parseCSV(text) {
     return;
   }
   renderViewedRow();
+}
+
+function populateMemberSelect(names) {
+  const sel = document.getElementById('member-select');
+  sel.innerHTML = '';
+  for (const name of names) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  }
+  const saved = localStorage.getItem('cote_member') || '';
+  sel.value = names.includes(saved) ? saved : (names[0] || '');
 }
 
 function splitCSVRow(row) {
@@ -212,71 +205,32 @@ function navigateTo(idx) {
   renderViewedRow();
 }
 
-async function renderViewedRow() {
+function renderViewedRow() {
   const row = allRows[viewIndex];
   if (!row) return;
   const isToday = viewIndex === todayIndex;
 
-  // Nav buttons
   document.getElementById('btn-prev').disabled = viewIndex <= 0;
   document.getElementById('btn-next').disabled = viewIndex >= allRows.length - 1;
 
-  // Date label
   document.getElementById('problem-date').textContent =
     row.date + (isToday ? ' (오늘)' : '');
 
-  // Title helper
   const titleEl = document.getElementById('problem-title');
-  function setTitle(text) {
-    if (row.link) {
-      const a = document.createElement('a');
-      a.href = row.link;
-      a.target = '_blank';
-      a.textContent = text;
-      titleEl.textContent = '';
-      titleEl.appendChild(a);
-    } else {
-      titleEl.textContent = text;
-    }
-  }
-
-  // Meta (tier/stats)
-  const metaEl = document.getElementById('problem-meta');
-  if (!row.isBaekjoon) {
-    metaEl.style.display = 'none';
-    setTitle(row.title);
+  if (row.link) {
+    const a = document.createElement('a');
+    a.href = row.link;
+    a.target = '_blank';
+    a.textContent = row.title;
+    titleEl.textContent = '';
+    titleEl.appendChild(a);
   } else {
-    metaEl.style.display = '';
-    document.getElementById('tier-badge').className = 'tier-badge tier-unrated';
-    document.getElementById('tier-badge').textContent = '?';
-    document.getElementById('problem-stats').textContent = '';
-    setTitle('로딩 중…');
+    titleEl.textContent = row.title;
   }
 
   setStatus('');
   updateTimerDisplay();
   updateStartBtn();
-
-  // Fetch tier/stats + title (Baekjoon only)
-  if (row.isBaekjoon && row.problemId) {
-    try {
-      const data = await fetchSolvedAC(`/problem/show?problemId=${row.problemId}`);
-      if (allRows[viewIndex] === row) {
-        setTitle(data.titleKo || data.title || row.title);
-        renderTierBadge(data.level);
-        const ac = data.acceptedUserCount?.toLocaleString() ?? '?';
-        const rate = data.averageTries ? data.averageTries.toFixed(1) : '?';
-        document.getElementById('problem-stats').textContent =
-          `맞힌 사람 ${ac}명 · 평균 시도 ${rate}회`;
-        setStatus('');
-      }
-    } catch (e) {
-      if (allRows[viewIndex] === row) {
-        setTitle(row.title);
-        setStatus('solved.ac 로드 실패');
-      }
-    }
-  }
 }
 
 function updateTimerDisplay() {
@@ -345,37 +299,13 @@ function updateStartBtn() {
   }
 }
 
-function renderTierBadge(level) {
-  const badge = document.getElementById('tier-badge');
-  const cls = TIER_CLASS[level] || 'unrated';
-  const name = TIER_NAMES[level] || 'Unrated';
-  badge.className = `tier-badge tier-${cls}`;
-  badge.textContent = name;
-}
-
-// ── solved.ac API ─────────────────────────────────────────────────────────────
-async function fetchSolvedAC(path) {
-  const url = `https://solved.ac/api/v3${path}`;
-  try {
-    const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    if (!r.ok) throw new Error(r.status);
-    return r.json();
-  } catch (e) {
-    if (IS_EXTENSION) throw e;
-    const proxy = `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
-    const r = await fetch(proxy);
-    if (!r.ok) throw new Error(r.status);
-    return r.json();
-  }
-}
-
 // ── Timer ─────────────────────────────────────────────────────────────────────
 function onBtnStartClick() {
   if (solvedAt !== null) return;
   if (!timerRunning) {
     timerStart();
   } else {
-    checkSolved(true);
+    checkSolved();
   }
 }
 
@@ -466,12 +396,12 @@ function renderTimer() {
 }
 
 // ── Check & Record ────────────────────────────────────────────────────────────
-async function checkSolved(manual = false) {
+async function checkSolved() {
   if (viewIndex !== todayIndex || !todayRow) return;
   const member = document.getElementById('member-select').value;
 
   try {
-    // 1단계: 시트 확인 (백준/비백준 공통)
+    // 시트에 이미 기록된 값이 있으면 그걸로 확정
     const sheetVal = todayRow.memberValues[member];
     if (sheetVal !== '') {
       const minutes = parseFloat(sheetVal);
@@ -480,54 +410,17 @@ async function checkSolved(manual = false) {
       return;
     }
 
-    if (!todayRow.isBaekjoon) {
-      // 비백준: confirm 팝업으로 수동 확인
-      const confirmed = confirm(`${todayRow.title}\n\n풀이를 완료했나요?`);
-      if (!confirmed) return;
-      const currentElapsed = elapsedSeconds;
-      markSolved(currentElapsed);
-      if (currentElapsed > 0) {
-        const solveMin = (currentElapsed / 60).toFixed(1);
-        setStatus('시트에 기록 중…');
-        await recordToSheet(member, todayRow.date, parseFloat(solveMin));
-        todayRow.memberValues[member] = solveMin;
-      }
-      setStatus('');
-      return;
+    const confirmed = confirm(`${todayRow.title}\n\n풀이를 완료했나요?`);
+    if (!confirmed) return;
+    const currentElapsed = elapsedSeconds;
+    markSolved(currentElapsed);
+    if (currentElapsed > 0) {
+      const solveMin = (currentElapsed / 60).toFixed(1);
+      setStatus('시트에 기록 중…');
+      await recordToSheet(member, todayRow.date, parseFloat(solveMin));
+      todayRow.memberValues[member] = solveMin;
     }
-
-    // 2단계: 백준 — solved.ac 확인
-    const solvedId = document.getElementById('solved-id').value.trim();
-    if (!solvedId || !todayRow.problemId) return;
-
-    setStatus('solved.ac 확인 중…');
-    const query = `id:${todayRow.problemId} s@${solvedId}`;
-    const data = await fetchSolvedAC(`/search/problem?query=${encodeURIComponent(query)}&page=1`);
-
-    if (data.count > 0) {
-      const currentElapsed = elapsedSeconds;
-      markSolved(currentElapsed);
-      if (currentElapsed > 0) {
-        const solveMin = (currentElapsed / 60).toFixed(1);
-        setStatus('시트에 기록 중…');
-        await recordToSheet(member, todayRow.date, parseFloat(solveMin));
-        todayRow.memberValues[member] = solveMin;
-      }
-      setStatus('');
-    } else {
-      if (!manual) { setStatus('풀이 기록 없음'); return; }
-      const confirmed = confirm(`${todayRow.title}\n\n아직 풀지 않은 문제입니다. 정말 완료하시겠습니까?`);
-      if (!confirmed) { setStatus('풀이 기록 없음'); return; }
-      const currentElapsed = elapsedSeconds;
-      markSolved(currentElapsed);
-      if (currentElapsed > 0) {
-        const solveMin = (currentElapsed / 60).toFixed(1);
-        setStatus('시트에 기록 중…');
-        await recordToSheet(member, todayRow.date, parseFloat(solveMin));
-        todayRow.memberValues[member] = solveMin;
-      }
-      setStatus('');
-    }
+    setStatus('');
   } catch (e) {
     setStatus('오류: ' + e.message);
   }
@@ -556,9 +449,7 @@ async function recordToSheet(member, date, solveTime) {
 function onMemberChange() {
   const member = document.getElementById('member-select').value;
   localStorage.setItem('cote_member', member);
-  loadSolvedIdForMember(member);
 
-  // 타이머 초기화
   if (timerRunning) {
     clearInterval(timerInterval);
     timerRunning = false;
@@ -569,7 +460,6 @@ function onMemberChange() {
   localStorage.setItem('cote_timer_running', 'false');
   localStorage.setItem('cote_timer_paused_at', '0');
 
-  // 새 팀원의 solved 상태 확인
   if (viewIndex === todayIndex && todayRow) {
     const sheetVal = todayRow.memberValues[member];
     if (sheetVal !== '') {
@@ -589,17 +479,6 @@ function onMemberChange() {
   renderTimer();
   updateStartBtn();
   updateTimerDisplay();
-}
-
-function loadSolvedIdForMember(member) {
-  const id = localStorage.getItem(`cote_solved_id_${member}`) || '';
-  document.getElementById('solved-id').value = id;
-}
-
-function saveSolvedId() {
-  const member = document.getElementById('member-select').value;
-  const id = document.getElementById('solved-id').value.trim();
-  localStorage.setItem(`cote_solved_id_${member}`, id);
 }
 
 function saveScriptUrl() {

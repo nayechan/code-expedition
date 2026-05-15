@@ -32,7 +32,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelector('.copy-btn').addEventListener('click', copyScript);
 });
 
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8imwJIvl6ZkTdvBtgG3uHkf6tz4St8rCzHHeBjPHL7EDb5p0_PbbFxejDXJuDy8HiXA/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOWf980I4iRCEMg1WnrX1aB917dD9Ckl7vYrOqzbyom3Z-FqNaYv3RNmunlpphmhE/exec';
 
 function loadSettings() {
   const url = localStorage.getItem('cote_script_url') || DEFAULT_SCRIPT_URL;

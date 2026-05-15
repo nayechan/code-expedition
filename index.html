@@ -333,8 +333,8 @@
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   const display = sheet.getDataRange().getDisplayValues();
 
-  // 헤더 행에서 팀원 이름 → 컬럼 인덱스 동적 구성 (Average 이전까지)
-  const header = display[0];
+  // 2행에서 팀원 이름 → 컬럼 인덱스 동적 구성 (Average 이전까지)
+  const header = display[1];
   const memberCol = {};
   for (let c = 3; c &lt; header.length; c++) {
     const name = header[c].trim();
@@ -345,7 +345,7 @@
   const col = memberCol[p.member];
   if (!col) return json({ ok: false, error: 'Unknown member: ' + p.member });
 
-  for (let i = 1; i &lt; display.length; i++) {
+  for (let i = 2; i &lt; display.length; i++) {
     if (normDate(display[i][0]) === p.date) {
       sheet.getRange(i + 1, col).setValue(parseFloat(p.solveTime));
       return json({ ok: true });

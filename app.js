@@ -118,10 +118,10 @@ function parseCSV(text) {
   allRows = [];
   todayIndex = -1;
 
-  if (rows.length === 0) return;
+  if (rows.length < 2) return;
 
-  // 헤더 행에서 팀원 이름과 컬럼 인덱스 추출 (Average 열 이전까지)
-  const headerCols = splitCSVRow(rows[0]);
+  // 2행에서 팀원 이름과 컬럼 인덱스 추출 (Average 열 이전까지)
+  const headerCols = splitCSVRow(rows[1]);
   const memberNames = [];
   const memberColIdx = {};
   for (let c = 3; c < headerCols.length; c++) {
@@ -132,7 +132,7 @@ function parseCSV(text) {
   }
   populateMemberSelect(memberNames);
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = 2; i < rows.length; i++) {
     const cols = splitCSVRow(rows[i]);
     const rawDate = cols[0] || '';
     const norm = normalizeDate(rawDate);
